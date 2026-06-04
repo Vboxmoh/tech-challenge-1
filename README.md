@@ -1,60 +1,129 @@
-# Overview
-This repository contains a React frontend, and an Express backend that the frontend connects to.
+# DevOps Tech Challenge 1
 
-# Objective
-Deploy the frontend and backend to somewhere publicly accessible over the internet. The AWS Free Tier should be more than sufficient to run this project, but you may use any platform and tooling you'd like for your solution.
+## Overview
+This project deploys a Node.js frontend and backend application to AWS ECS Fargate using a fully automated CI/CD pipeline with Jenkins. Infrastructure is provisioned using Terraform.
 
-Fork this repo as a base. You may change any code in this repository to suit the infrastructure you build in this code challenge.
+## Architecture
 
-# Submission
-1. A github repo that has been forked from this repo with all your code.
-2. Modify this README file with instructions for:
-* Any tools needed to deploy your infrastructure
-* All the steps needed to repeat your deployment process
-* URLs to the your deployed frontend.
+### CI/CD Pipeline
+GitHub → Webhook → Jenkins (Docker on EC2) → Docker Build → Amazon ECR → ECS Service Update
+### Runtime Application
+User → ALB → ECS Cluster
+├── Frontend ECS Fargate (React)
+└── Backend ECS Fargate (Express) ← /api
+### Infrastructure Provisioning (Terraform)
+Terraform → VPC → Public Subnets → Security Groups → ALB → ECS Cluster → ECS Services → Amazon ECR → IAM Roles
+## Stack
+- Frontend: React (Node.js)
+- Backend: Express (Node.js)
+- Containerization: Docker
+- Container Registry: Amazon ECR
+- Orchestration: AWS ECS Fargate
+- Load Balancer: AWS Application Load Balancer
+- CI/CD: Jenkins (Docker on EC2)
+- IaC: Terraform
+- Region: eu-west-3 (Paris)
 
-# Evaluation
-You will be evaluated on the ease to replicate your infrastructure. This is a combination of quality of the instructions, as well as any scripts to automate the overall setup process.
+## Application URLs
+- Frontend: http://devops-tc1-alb-679051767.eu-west-3.elb.amazonaws.com
+- Backend API: http://devops-tc1-alb-679051767.eu-west-3.elb.amazonaws.com/api
 
-# Setup your environment
-Install nodejs. Binaries and installers can be found on nodejs.org.
-https://nodejs.org/en/download/
+## Jenkins Server
+- URL: http://35.180.22.22:8080
+- Username: admin
 
-For macOS or Linux, Nodejs can usually be found in your preferred package manager.
-https://nodejs.org/en/download/package-manager/
+## Infrastructure Components
 
-Depending on the Linux distribution, the Node Package Manager `npm` may need to be installed separately.
+### Manually Provisioned (Jenkins Server)
+- EC2 instance (t3.micro) running Amazon Linux 2023
+- Jenkins running inside a Docker container
+- Security Group allowing SSH (22), Jenkins (8080) and agent (50000) traffic
+- IAM user jenkins-ci-user with ECR and ECS permissions
 
-# Running the project
-The backend and the frontend will need to run on separate processes. The backend should be started first.
+### Terraform Provisioned (Application Infrastructure)
+- VPC with 2 public subnets across 2 availability zones
+- Internet Gateway and Route Tables
+- Security Groups for ALB and ECS
+- Application Load Balancer with path-based routing
+- ECS Cluster (Fargate)
+- ECS Task Definitions for frontend and backend
+- ECS Services for frontend and backend
+- ECR Repositories for frontend and backend images
+- IAM Role for ECS task execution
+- CloudWatch Log Groups
+- Auto Scaling policies (min 1, max 4, 50% CPU trigger)
+
+## ECS Configuration
+- Launch type: Fargate
+- CPU per task: 0.5 vCPU (512 CPU units)
+- Memory per task: 1 GB
+- Minimum tasks: 1
+- Desired tasks: 1
+- Maximum tasks: 4
+- Auto Scaling trigger: 50% CPU utilization
+
+## Deployment Steps
+
+### Prerequisites
+- AWS CLI configured
+- Terraform installed
+- Docker Desktop installed
+- Node.js installed
+
+### Local Setup
+```bash
+git clone https://github.com/Vboxmoh/tech-challenge-1.git
+cd tech-challenge-1
 ```
+
+### Backend
+```bash
 cd backend
 npm ci
 npm start
 ```
-The backend should response to a GET request on `localhost:8080`.
 
-With the backend started, the frontend can be started.
-```
+### Frontend
+```bash
 cd frontend
-npm ci
+npm install
 npm start
 ```
-The frontend can be accessed at `localhost:3000`. If the frontend successfully connects to the backend, a message saying "SUCCESS" followed by a guid should be displayed on the screen.  If the connection failed, an error message will be displayed on the screen.
 
-# Configuration
-The frontend has a configuration file at `frontend/src/config.js` that defines the URL to call the backend. This URL is used on `frontend/src/App.js#12`, where the front end will make the GET call during the initial load of the page.
+### Docker Setup
+```bash
+docker-compose up --build
+```
 
-The backend has a configuration file at `backend/config.js` that defines the host that the frontend will be calling from. This URL is used in the `Access-Control-Allow-Origin` CORS header, read in `backend/index.js#14`
+### Terraform Infrastructure Deployment
+```bash
+cd terraform
+terraform init
+terraform plan
+terraform apply
+```
 
-# Optional Extras
-The core requirement for this challenge is to get the provided application up and running for consumption over the public internet. That being said, there are some opportunities in this code challenge to demonstrate your skill sets that are above and beyond the core requirement.
+### Jenkins Pipeline
+The Jenkins pipeline automatically:
+1. Checks out code from GitHub
+2. Logs into Amazon ECR
+3. Builds Docker images for frontend and backend
+4. Pushes images to ECR
+5. Updates ECS services with new images
 
-A few examples of extras for this coding challenge:
-1. Dockerizing the application
-2. Scripts to set up the infrastructure
-3. Providing a pipeline for the application deployment
-4. Running the application in a serverless environment
+### GitHub Webhook Automation
+GitHub webhooks are configured to automatically trigger the Jenkins pipeline on every push to the main branch.
+Webhook URL: http://35.180.22.22:8080/github-webhook/
 
-This is not an exhaustive list of extra features that could be added to this code challenge. At the end of the day, this section is for you to demonstrate any skills you want to show that’s not captured in the core requirement.
-# webhook test
+## Amazon ECR Repositories
+- Frontend: 277778298945.dkr.ecr.eu-west-3.amazonaws.com/devops-tc1-frontend
+- Backend: 277778298945.dkr.ecr.eu-west-3.amazonaws.com/devops-tc1-backend
+
+## Bonus: GitOps Alternative with GitHub Actions
+A GitOps alternative using GitHub Actions is implemented in the gitops branch.
+
+### Branch Strategy
+**main branch** — Jenkins-based deployment pipeline
+GitHub → Webhook → Jenkins → Docker Build → Amazon ECR → Amazon ECS
+**gitops branch** — GitHub Actions deployment pipeline
+GitHub Push → GitHub Actions → Docker Build → Amazon ECR → Amazon ECS
